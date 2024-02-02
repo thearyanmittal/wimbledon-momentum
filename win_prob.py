@@ -508,105 +508,107 @@ def win_prob(sets, games, points):
     return val * win_prob(sets, str(g1 + 1) + "-" + str(g2), None) + (1-val) * win_prob(sets, str(g1) + "-" + str(g2+1), None)
 
 
+class Metric_Finder():
+    def __init__(self, p):
+        self.p = p
+        self.games_dict = gen_set_dict(p)
+        self.tb_dict_7 = gen_tb_dict(p, 7)
+        self.tb_dict_10 = gen_tb_dict(p, 10)
+        self.game_dict_serving = gen_game_dict(p)
+        self.game_dict_receiving = gen_game_dict(1-p)
 
-def find_metric(sets, games, points, curr_server, p): 
-    games_dict = gen_set_dict(p)
-    tb_dict_7 = gen_tb_dict(p, 7)
-    tb_dict_10 = gen_tb_dict(p, 10)
-    game_dict_serving = gen_game_dict(p)
-    game_dict_receiving = gen_game_dict(1-p)
-    def aheadness_metric(sets, games, points, curr_server, p):
-        """
-        sets (str): 'X-Y' where X is player1 sets, Y is player2 sets
-        games (str): 'X-Y' where X is player1 games, Y is player2 games
-        points (str): 'X-Y' where X is player1 points, Y is player2 points
-        curr_server (int): 1 if player1 serving, 2 if player2 serving
-        p (float): 0.0-1.0, probability that the serving player wins a service game
+    def find_metric(self, sets, games, points, curr_server): 
+        def aheadness_metric(sets, games, points, curr_server):
+            """
+            sets (str): 'X-Y' where X is player1 sets, Y is player2 sets
+            games (str): 'X-Y' where X is player1 games, Y is player2 games
+            points (str): 'X-Y' where X is player1 points, Y is player2 points
+            curr_server (int): 1 if player1 serving, 2 if player2 serving
+            p (float): 0.0-1.0, probability that the serving player wins a service game
 
-        The probability that player1 wins this match
-        """
-        sets_hardcoded = {
-            "0-0": 0.5,
-            "0-1": 0.3125,
-            "1-0": 0.6875,
-            "1-1": 0.5,
-            "2-0": 0.875,
-            "0-2": 0.125,
-            "2-1": 0.75,
-            "1-2": 0.25,
-            "2-2": 0.5,
-            "3-0": 1,
-            "3-1": 1,
-            "3-2": 1,
-            "0-3": 0,
-            "1-3": 0,
-            "2-3": 0
-        }
-        
-        if games == None:
-            return sets_hardcoded[sets]
-        if points == None:
+            The probability that player1 wins this match
+            """
+            sets_hardcoded = {
+                "0-0": 0.5,
+                "0-1": 0.3125,
+                "1-0": 0.6875,
+                "1-1": 0.5,
+                "2-0": 0.875,
+                "0-2": 0.125,
+                "2-1": 0.75,
+                "1-2": 0.25,
+                "2-2": 0.5,
+                "3-0": 1,
+                "3-1": 1,
+                "3-2": 1,
+                "0-3": 0,
+                "1-3": 0,
+                "2-3": 0
+            }
+            
+            if games == None:
+                return sets_hardcoded[sets]
+            if points == None:
+                s1, s2 = map(int, sets.split("-"))
+                g1, g2 = map(int, games.split("-"))
+                
+                return self.games_dict[games + "-" + str(curr_server)] * aheadness_metric(str(s1 + 1) + "-" + str(s2), None, None, None) + (1 - self.games_dict[games + "-" + str(curr_server)]) * aheadness_metric(str(s1) + "-" + str(s2 + 1), None, None, None)
+            
             s1, s2 = map(int, sets.split("-"))
             g1, g2 = map(int, games.split("-"))
-            
-            return games_dict[games + "-" + str(curr_server)] * aheadness_metric(str(s1 + 1) + "-" + str(s2), None, None, None, p) + (1 - games_dict[games + "-" + str(curr_server)]) * aheadness_metric(str(s1) + "-" + str(s2 + 1), None, None, None, p)
-        
-        s1, s2 = map(int, sets.split("-"))
-        g1, g2 = map(int, games.split("-"))
-        p1, p2 = points.split("-")
-        tiebreak = (g1 == 6) and (g2 == 6) 
-        ten_point_tb = tiebreak and (s1 == 2) and (s2 == 2)
-        val = -1
-        if tiebreak:
-            dur = 7
-            if (ten_point_tb):
-                dur = 10
-            p1 = int(p1)
-            p2 = int(p2)
-            if (p1 >= dur - 1) and (p2 >= dur-1):
-                if (p1 == p2):
-                    val = 0.5
-                elif (p1 == p2 + 1):
-                    if curr_server == 1: # D + 1, 1
-                        val = 0.5 + p/2
-                    else: # D + 1, 2
-                        val = 1.0 - p/2
-                elif (p1 + 1 == p2):
-                    if curr_server == 1: # D - 1, 1
-                        val = p/2
-                    else: # D - 1, 2
-                        val = 0.5 - p/2
-                else:
-                    if p1 > p2:
-                        val = 1.0
+            p1, p2 = points.split("-")
+            tiebreak = (g1 == 6) and (g2 == 6) 
+            ten_point_tb = tiebreak and (s1 == 2) and (s2 == 2)
+            val = -1
+            if tiebreak:
+                dur = 7
+                if (ten_point_tb):
+                    dur = 10
+                p1 = int(p1)
+                p2 = int(p2)
+                if (p1 >= dur - 1) and (p2 >= dur-1):
+                    if (p1 == p2):
+                        val = 0.5
+                    elif (p1 == p2 + 1):
+                        if curr_server == 1: # D + 1, 1
+                            val = 0.5 + self.p/2
+                        else: # D + 1, 2
+                            val = 1.0 - self.p/2
+                    elif (p1 + 1 == p2):
+                        if curr_server == 1: # D - 1, 1
+                            val = self.p/2
+                        else: # D - 1, 2
+                            val = 0.5 - self.p/2
                     else:
-                        val = 0.0
-            
-            if (p1 == dur) and (p2 < dur - 1):
-                val = 1.0
-            elif (p1 < dur-1) and (p2 == dur):
-                val = 0.0
-            
-            if (val == -1):
+                        if p1 > p2:
+                            val = 1.0
+                        else:
+                            val = 0.0
                 
-                #print(points)
-                if dur == 7:
-                    val = tb_dict_7[points + "-" + str(curr_server)]
-                else:
-                    val = tb_dict_10[points + "-" + str(curr_server)]
-                #print("it works")
-        else:
-            game_dict = None
-            if curr_server == 1:
-                game_dict = game_dict_serving # p1 service game
+                if (p1 == dur) and (p2 < dur - 1):
+                    val = 1.0
+                elif (p1 < dur-1) and (p2 == dur):
+                    val = 0.0
+                
+                if (val == -1):
+                    
+                    #print(points)
+                    if dur == 7:
+                        val = self.tb_dict_7[points + "-" + str(curr_server)]
+                    else:
+                        val = self.tb_dict_10[points + "-" + str(curr_server)]
+                    #print("it works")
             else:
-                game_dict = game_dict_receiving # p1 receiving game
-            #print(game_dict)
-            val = game_dict[points]
+                game_dict = None
+                if curr_server == 1:
+                    game_dict = self.game_dict_serving # p1 service game
+                else:
+                    game_dict = self.game_dict_receiving # p1 receiving game
+                #print(game_dict)
+                val = game_dict[points]
 
-        return val * aheadness_metric(sets, str(g1 + 1) + "-" + str(g2), None, (curr_server % 2) + 1, p) + (1-val) * aheadness_metric(sets, str(g1) + "-" + str(g2+1), None, (curr_server % 2) + 1, p)
-    return aheadness_metric(sets, games, points, curr_server, p)
+            return val * aheadness_metric(sets, str(g1 + 1) + "-" + str(g2), None, (curr_server % 2) + 1) + (1-val) * aheadness_metric(sets, str(g1) + "-" + str(g2+1), None, (curr_server % 2) + 1)
+        return aheadness_metric(sets, games, points, curr_server)
 
-#print(find_metric("0-0", "2-2", "AD-40", 2, 0.6))
-#print(gen_set_dict(0.6))
-
+met = Metric_Finder(0.6)
+print(met.find_metric("0-0","0-0","15-0", 1))
