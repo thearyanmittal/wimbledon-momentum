@@ -1,37 +1,176 @@
-##### CODE TO GENERATE HARDCODED DICTS ######
-# def calculate_probabilities(score1, score2, probabilities):
-#     if score1 == 10 or score2 == 10:
-#         # Game is over, return the result
-#         if score1 == 10:
-#             probabilities[(score1, score2)] = 1.0
-#         else:
-#             probabilities[(score1, score2)] = 0.0
-#         return probabilities
+def gen_tb_dict(p, dur):
+    """
+    p (float): Probability server wins service point
+    dur (int): Either 7 or 10 point tiebreak
+    """
+    ans = {}
+    def tb_prop(p1, p2, server):
+        """
+        p1 (int): number of points that player1 has
+        p2 (int): number of points that player2 has
+        curr_server (int): # of the player serving (1 or 2)
+        """
+        #print(p1,p2)
+        if (p1, p2, server) in ans:
+            return
+        if (p1 >= dur - 1) and (p2 >= dur-1):
+            if (p1 == p2):
+                ans[(p1, p2, server)] = 0.5
+                return
+            if (p1 == p2 + 1):
+                if server == 1: # D + 1, 1
+                    ans[(p1, p2, server)] = 0.5 + p/2
+                else: # D + 1, 2
+                    ans[(p1, p2, server)] = 1.0 - p/2
+                return
+            if (p1 + 1 == p2):
+                if server == 1: # D - 1, 1
+                    ans[(p1, p2, server)] = p/2
+                else: # D - 1, 2
+                    ans[(p1, p2, server)] = 0.5 - p/2
+                return
+            if p1 > p2:
+                ans[(p1, p2, server)] = 1.0
+                return
+            ans[(p1, p2, server)] = 0.0
+            return
+        
+        if (p1 == dur) and (p2 < dur - 1):
+            ans[(p1, p2, server)] = 1.0
+            return
+        if (p1 < dur-1) and (p2 == dur):
+            ans[(p1, p2, server)] = 0.0
+            return
+        
+        n = server
+        if (p1 + p2) % 2 == 0:
+            n = (server % 2) + 1
+        
+        tb_prop(p1+1, p2, n)
+        tb_prop(p1, p2+1, n)
 
-#     # Check if the result is already calculated
-#     if (score1, score2) in probabilities:
-#         return probabilities
+        if (server == 1):
+            ans[(p1, p2, server)] = p * ans[(p1 + 1, p2, n)] + (1-p) * ans[(p1, p2 + 1, n)]
+        else:
+            ans[(p1, p2, server)] = (1 - p) * ans[(p1 + 1, p2, n)] + p * ans[(p1, p2 + 1, n)]
 
-#     # Recursive calls for different outcomes
-#     probabilities = calculate_probabilities(score1 + 1, score2, probabilities)
-#     probabilities = calculate_probabilities(score1, score2 + 1, probabilities)
+    tb_prop(0,0,1)
+    tb_prop(0,0,2)
 
-#     # Calculate probability for the current state
-#     probabilities[(score1, score2)] = 0.5 * (probabilities.get((score1 + 1, score2), 0) +
-#                                              probabilities.get((score1, score2 + 1), 0))
+    out = {}
+    for key in ans.keys():
+        out[str(key[0]) + "-" + str(key[1]) + "-" + str(key[2])] = ans[key]
+    
+    return out
 
-#     return probabilities
+def gen_set_dict(p):
+    """
+    p (float): probability server wins service point
+    """
+    ans = {}
+    def in_set_prob(g1, g2, server):
+        """
+        g1 (int): number of games that player1 has
+        g2 (int): number of games that player2 has
+        curr_server (int): # of the player serving (1 or 2)
+        """
+        if (g1, g2) in ans:
+            return
+        if g1 == 7 and g2 == 5:
+            ans[(g1, g2, server)] = 1.0
+            return
+        if g1 == 7 and g2 == 6:
+            ans[(g1, g2, server)] = 1.0
+            return
+        if g1 == 5 and g2 == 7:
+            ans[(g1, g2, server)] = 0.0
+            return
+        if g1 == 6 and g2 == 7:
+            ans[(g1, g2, server)] = 0.0
+            return
+        if g1 == 6 and g2 < 5:
+            ans[(g1, g2, server)] = 1.0
+            return
+        if g1 < 5 and g2 == 6:
+            ans[(g1, g2, server)] = 0.0
+            return
+        if g1 == 6 and g2 == 6:
+            ans[(g1, g2, server)] = 0.5
+            return
+        n = (server % 2) + 1
+        in_set_prob(g1 + 1, g2, n)
+        in_set_prob(g1, g2 + 1, n)
+        w = 0
+        if server == 1:
+            w = gen_game_dict(p)["0-0"] # odds p1 holds serve
+        else:
+            w = gen_game_dict(1-p)["0-0"] # odds p1 breaks serve
+        ans[(g1, g2, server)] = w * ans[(g1 + 1, g2, n)] + (1 - w) * ans[(g1, g2 + 1, n)]
 
-# # Initialize the probabilities dictionary
-# probabilities_dict = {}
+    in_set_prob(0, 0, 1)
+    in_set_prob(0, 0, 2)
+    ans[(7,6,1)] = 1.0
+    ans[(7,6,2)] = 1.0
+    ans[(6,7,1)] = 0.0
+    ans[(6,7,2)] = 0.0
 
-# # Calculate probabilities starting from 0-0
-# calculate_probabilities(0, 0, probabilities_dict)
+    out = {}
+    for key in ans.keys():
+        out[str(key[0]) + "-" + str(key[1]) + "-" + str(key[2])] = ans[key]
+    
+    return out
 
-# # Print the resulting dictionary
-# #print(probabilities_dict)
-# for key in probabilities_dict.keys():
-#     print("'" + str(key[0]) + "-" + str(key[1]) + "'" + ": " + str(probabilities_dict[key]) + ",")
+
+def gen_game_dict(p):
+    d = p**2/(1-2*p*(1-p))
+    ans = {}
+    ans[(3,3)] = d
+    ans[(4,4)] = d
+    ans[(4,3)] = p + (1-p)*d
+    ans[(3,4)] = p*d
+    
+    def in_game_prob(points1, points2):
+        """
+        Probability that player1 wins this game
+        points1 (int): 0 -> 0, 1 -> 15, 2 -> 30, 3 -> 40, 4 -> AD, number of points that player1 has
+        points2 (int): 0 -> 0, 1 -> 15, 2 -> 30, 3 -> 40, 4 -> AD, number of points that player2 has
+        p (float): probability that player1 wins a point in this game
+        """
+        if (points1 > 4) and (points2 == 3):
+            ans[(points1, points2)] = 1.0
+            return
+        if (points1 == 3) and (points2 > 4):
+            ans[(points1, points2)] = 0.0
+            return
+        if (points1 == 4) and (points2 < 3):
+            ans[(points1, points2)] = 1.0
+            return
+        if (points1 < 3) and (points2 == 4):
+            ans[(points1, points2)] = 0.0
+            return
+        
+        if (points1 == 4) and (points2 == 4):
+            points1 = 3
+            points2 = 3
+        
+        if (points1, points2) in ans:
+            return
+        
+        in_game_prob(points1+1, points2)
+        in_game_prob(points1, points2+1)
+        
+
+        ans[(points1, points2)] = p * ans[(points1 + 1, points2)] + (1 - p ) * ans[(points1, points2 + 1)]
+    
+    in_game_prob(0, 0)
+    out = {}
+    L = ["0", "15", "30", "40", "AD"]
+    for key in ans.keys():
+        out[L[key[0]] + "-" + L[key[1]]] = ans[key]
+    
+    return out
+
+#print(gen_set_dict(0.60))
 
 def win_prob(sets, games, points):
     """
@@ -369,5 +508,105 @@ def win_prob(sets, games, points):
     return val * win_prob(sets, str(g1 + 1) + "-" + str(g2), None) + (1-val) * win_prob(sets, str(g1) + "-" + str(g2+1), None)
 
 
-#print(win_prob("2-2", "5-6", "40-AD"))
+
+def find_metric(sets, games, points, curr_server, p): 
+    games_dict = gen_set_dict(p)
+    tb_dict_7 = gen_tb_dict(p, 7)
+    tb_dict_10 = gen_tb_dict(p, 10)
+    game_dict_serving = gen_game_dict(p)
+    game_dict_receiving = gen_game_dict(1-p)
+    def aheadness_metric(sets, games, points, curr_server, p):
+        """
+        sets (str): 'X-Y' where X is player1 sets, Y is player2 sets
+        games (str): 'X-Y' where X is player1 games, Y is player2 games
+        points (str): 'X-Y' where X is player1 points, Y is player2 points
+        curr_server (int): 1 if player1 serving, 2 if player2 serving
+        p (float): 0.0-1.0, probability that the serving player wins a service game
+
+        The probability that player1 wins this match
+        """
+        sets_hardcoded = {
+            "0-0": 0.5,
+            "0-1": 0.3125,
+            "1-0": 0.6875,
+            "1-1": 0.5,
+            "2-0": 0.875,
+            "0-2": 0.125,
+            "2-1": 0.75,
+            "1-2": 0.25,
+            "2-2": 0.5,
+            "3-0": 1,
+            "3-1": 1,
+            "3-2": 1,
+            "0-3": 0,
+            "1-3": 0,
+            "2-3": 0
+        }
+        
+        if games == None:
+            return sets_hardcoded[sets]
+        if points == None:
+            s1, s2 = map(int, sets.split("-"))
+            g1, g2 = map(int, games.split("-"))
+            
+            return games_dict[games + "-" + str(curr_server)] * aheadness_metric(str(s1 + 1) + "-" + str(s2), None, None, None, p) + (1 - games_dict[games + "-" + str(curr_server)]) * aheadness_metric(str(s1) + "-" + str(s2 + 1), None, None, None, p)
+        
+        s1, s2 = map(int, sets.split("-"))
+        g1, g2 = map(int, games.split("-"))
+        p1, p2 = points.split("-")
+        tiebreak = (g1 == 6) and (g2 == 6) 
+        ten_point_tb = tiebreak and (s1 == 2) and (s2 == 2)
+        val = -1
+        if tiebreak:
+            dur = 7
+            if (ten_point_tb):
+                dur = 10
+            p1 = int(p1)
+            p2 = int(p2)
+            if (p1 >= dur - 1) and (p2 >= dur-1):
+                if (p1 == p2):
+                    val = 0.5
+                elif (p1 == p2 + 1):
+                    if curr_server == 1: # D + 1, 1
+                        val = 0.5 + p/2
+                    else: # D + 1, 2
+                        val = 1.0 - p/2
+                elif (p1 + 1 == p2):
+                    if curr_server == 1: # D - 1, 1
+                        val = p/2
+                    else: # D - 1, 2
+                        val = 0.5 - p/2
+                else:
+                    if p1 > p2:
+                        val = 1.0
+                    else:
+                        val = 0.0
+            
+            if (p1 == dur) and (p2 < dur - 1):
+                val = 1.0
+            elif (p1 < dur-1) and (p2 == dur):
+                val = 0.0
+            
+            if (val == -1):
+                
+                #print(points)
+                if dur == 7:
+                    val = tb_dict_7[points + "-" + str(curr_server)]
+                else:
+                    val = tb_dict_10[points + "-" + str(curr_server)]
+                #print("it works")
+        else:
+            game_dict = None
+            if curr_server == 1:
+                game_dict = game_dict_serving # p1 service game
+            else:
+                game_dict = game_dict_receiving # p1 receiving game
+            #print(game_dict)
+            val = game_dict[points]
+
+        return val * aheadness_metric(sets, str(g1 + 1) + "-" + str(g2), None, (curr_server % 2) + 1, p) + (1-val) * aheadness_metric(sets, str(g1) + "-" + str(g2+1), None, (curr_server % 2) + 1, p)
+    return aheadness_metric(sets, games, points, curr_server, p)
+
+#print(find_metric("0-0", "2-2", "AD-40", 2, 0.6))
+#print(gen_set_dict(0.6))
 
